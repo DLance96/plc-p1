@@ -155,10 +155,11 @@
 
 (define M_value_dot
   (lambda (expression benv break continue throw return* classes current_class instance)
-    (cond
-      ((eq? (get_operand1 expression) 'this) (get_field (get_operand2 expression) instance))
-      ((eq? (get_operand1 expression) 'super) (get_field (get_operand2 expression) (get_operand1 instance)))
-      (else (get_field (get_operand2 expression) (get_from_env benv (get_operand1 expression)))))))
+    (if (eq? (get_operand1 expression) 'this)
+        (get_field (get_operand2 expression) instance)
+        (if (eq? (and (pair? (get_operand1 expression)) (car (get_operand1 expression))) 'new)
+            (get_field (get_operand2 expression) (M_value (get_operand1 expression) benv break continue throw return* classes current_class instance))
+            (get_field (get_operand2 expression) (get_from_env benv (get_operand1 expression)))))))
 ;------
 
 
@@ -180,11 +181,20 @@
        (if (eq? (get_operand1 expression) 'main)
            (evaluate (get_operand3 expression) benv default_brace break continue throw return* classes current_class instance)
            (if (list? (get_operand1 expression))
-               (cond
-                 ((eq? (get_operand1 (get_operand1 expression)) 'this) ((M_value (get_operand1 expression) benv break continue throw return* classes current_class instance) (map (lambda (m) (M_value m benv break continue throw return* classes current_class instance)) (get_parameter_list expression)) benv break continue throw _return classes current_class instance))
-                 ((eq? (get_operand1 (get_operand1 expression)) 'super) ((M_value (get_operand1 expression) benv break continue throw return* classes current_class (get_operand1 instance)) (map (lambda (m) (M_value m benv break continue throw return* classes current_class (get_operand1 instance))) (get_parameter_list expression)) benv break continue throw _return classes current_class (get_operand1 instance)))
-                 (else ((M_value (get_operand1 expression) benv break continue throw return* classes current_class (get_from_env benv (get_operand1 (get_operand1 expression)))) (map (lambda (m) (M_value m benv break continue throw return* classes current_class (get_from_env benv (get_operand1 (get_operand1 expression))))) (get_parameter_list expression)) benv break continue throw _return classes current_class (get_from_env benv (get_operand1 (get_operand1 expression)))))) 
-               ((get_from_env benv (get_operand1 expression)) (map (lambda (m) (M_value m benv break continue throw return* classes current_class instance)) (get_parameter_list expression)) benv break continue throw _return classes current_class instance)))))))
+               (if (eq? (get_operand1 (get_operand1 expression)) 'this)
+                   ((M_value (get_operand1 expression) benv break continue throw return* classes current_class instance)
+                    (map (lambda (m) (M_value m benv break continue throw return* classes current_class instance)) (get_parameter_list expression))
+                    benv break continue throw _return classes current_class instance)
+                   (if (eq? (and (pair? (get_operand1 (get_operand1 expression))) (car (get_operand1 (get_operand1 expression)))) 'new)
+                       ((M_value (get_operand1 expression) benv break continue throw return* classes current_class (M_value (get_operand1 expression) benv break continue throw return* classes current_class instance))
+                        (map (lambda (m) (M_value m benv break continue throw return* classes current_class (M_value (get_operand1 expression) benv break continue throw return* classes current_class instance))) (get_parameter_list expression))
+                        benv break continue throw _return classes current_class (M_value (get_operand1 expression) benv break continue throw return* classes current_class instance))
+                       ((M_value (get_operand1 expression) benv break continue throw return* classes current_class (get_from_env benv (get_operand1 (get_operand1 expression))))
+                        (map (lambda (m) (M_value m benv break continue throw return* classes current_class (get_from_env benv (get_operand1 (get_operand1 expression))))) (get_parameter_list expression))
+                        benv break continue throw _return classes current_class (get_from_env benv (get_operand1 (get_operand1 expression))))))
+               ((get_from_env benv (get_operand1 expression)))))
+           (map (lambda (m) (M_value m benv break continue throw return* classes current_class instance)) (get_parameter_list expression))
+           benv break continue throw _return classes current_class instance))))
 
 ; M_state_begin: implemented for (begin ...) calls; (M_state_begin '(begin <expression>) state) -> state
 (define M_state_begin
